@@ -1,0 +1,93 @@
+.App {
+  font-family: 'Arial', sans-serif;
+  text-align: center;
+  background-color: #f4f4f8;
+  min-height: 100vh;
+}
+
+.App-logo {
+  height: 40vmin;
+  pointer-events: none;
+}
+
+.App-link {
+  color: #61dafb;
+  text-decoration: none;
+  margin-top: 20px;
+}
+
+input[type="file"] {
+  margin-top: 20px;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+input[type="file"]:hover {
+  background-color: #eee;
+}
+
+table {
+  margin-top: 20px;
+  border-collapse: collapse;
+  width: 80%;
+  margin-left: auto;
+  margin-right: auto;
+  overflow-x: auto; /* Enable horizontal scrolling */
+}
+
+table, th, td {
+  border: 1px solid #ddd;
+}
+
+th, td {
+  padding: 10px 15px;
+  text-align: left;
+}
+
+th {
+  background-color: #f2f2f2;
+  cursor: pointer; /* Indicate that the header is clickable */
+  transition: background-color 0.3s;
+}
+
+th:hover {
+  background-color: #ddd;
+}
+
+tr:hover {
+  background-color: #f5f5f5;
+}
+
+.progress-container {
+  width: 100%;
+  height: 20px;
+  background-color: #f3f3f3; /* Light gray background */
+  border-radius: 10px;       /* Rounded corners */
+  overflow: hidden;          /* Ensures inner bar stays within bounds */
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15); /* Slight shadow for depth */
+  margin-top: 10px;
+}
+
+.progress-fill {
+  height: 100%;
+  background-color: #4CAF50; /* Green fill color */
+  transition: width 0.4s;    /* Smooth transition for width changes */
+  width: 0%;                 /* Initial width, will be updated by React state */
+}
+
+.progress-text {
+  position: relative;
+  z-index: 2;              /* Sit above the progress-fill */
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: white;
+  font-weight: bold;
+  font-size: 12px;
+}
+
