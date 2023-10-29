@@ -41,20 +41,26 @@ function ExcelUpload() {
             console.log('updating excel:', dataToUpdate)
             // Read the uploaded Excel file
             const reader = new FileReader();
+            let colIndex = 0;
             reader.onload = function(e) {
                 const data = e.target.result;
                 const workbook = XLSX.read(data, { type: 'binary' });
     
                 // Update the Excel file based on dataToUpdate
                 for (const update of dataToUpdate) {
+                    console.log(update)
 
                     const { row, prediction } = update;
                     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     
-                    let colIndex = 0;
-                    while (sheet[XLSX.utils.encode_cell({ r: row, c: colIndex })]) {
-                        colIndex++;
+                    if (colIndex === 0) {
+                        while (sheet[XLSX.utils.encode_cell({ r: row, c: colIndex })]) {
+                            colIndex++;
+                        }
+                        colIndex--;
                     }
+
+                    console.log(colIndex)
     
                     const cellRef = XLSX.utils.encode_cell({ r: row, c: colIndex });
                     sheet[cellRef] = { t: 'n', v: prediction };
