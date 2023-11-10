@@ -20,6 +20,7 @@ const upload = multer({ storage: storage });
 
 let uploadedWorkbookBuffer = null; // Store the uploaded Excel buffer here
 
+console.log(process.env.OPENAI_API_KEY)
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY
 });
