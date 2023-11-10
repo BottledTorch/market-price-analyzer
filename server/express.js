@@ -20,7 +20,6 @@ const upload = multer({ storage: storage });
 
 let uploadedWorkbookBuffer = null; // Store the uploaded Excel buffer here
 
-console.log(process.env.OPENAI_API_KEY)
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY
 });
@@ -56,8 +55,15 @@ app.get("/getCorrectPrice", async (req, res) => {
         const priceList = req.query.priceList;
 
         const messages = [
-            { role: "system", content: "You are an assistant" },
-            { role: "user", content: `Given the item: ${item}, please select the most accurate guess considering the price estimate from the following options: ${priceList}. Note that -1 is never the correct answer. Double check your answer to be as accurate as possible. Specify your guess in the following format: { "guess": X }, for example, { "guess": 2 } if you believe that number 2 is the correct answer.`  }
+            {
+                "role": "system",
+                "content": "You are an assistant. Provide concise responses, directly addressing the user's request without additional explanation unless specifically asked for. Your answers should be brief and to the point."
+              },
+              {
+                "role": "user",
+                "content": `Given the item: ${item}, select the most accurate guess for the price estimate from the options: ${priceList}. Exclude -1 from consideration. Respond with your guess in the format: { "guess": X }. Your guess must be either { "guess": 0 }, { "guess": 1 } or { "guess": 2 }.`
+              }
+              
         ];
 
         const chatCompletion = await queryOpenAI(messages);

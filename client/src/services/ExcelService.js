@@ -13,8 +13,6 @@ export async function updateExcel(file, dataToUpdate) {
 
             // Update the Excel file based on dataToUpdate
             for (const update of dataToUpdate) {
-                console.log(update)
-
                 const { row, prediction } = update;
                 const sheet = workbook.Sheets[workbook.SheetNames[0]];
 
