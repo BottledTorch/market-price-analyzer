@@ -3,7 +3,7 @@ import * as XLSX from 'xlsx';
 
 function ExcelUpload() {
     const [data, setData] = useState([]);
-    const [selectedColumn, setSelectedColumn] = useState("");
+    const [selectedColumns, setSelectedColumns] = useState([]);
     const [file, setFile] = useState(null); // Convert 'file' to a state variable
     const [progress, setProgress] = useState(0); // 0 to 100
 
@@ -29,6 +29,7 @@ function ExcelUpload() {
         }
     };
 
+    
     // Function to check if a string is a UPC code
     const isUPC = (str) => {
         const upcPattern = /^\d{11,13}$/;
@@ -54,10 +55,9 @@ function ExcelUpload() {
                     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     
                     if (colIndex === 0) {
-                        while (sheet[XLSX.utils.encode_cell({ r: row, c: colIndex })]) {
+                        while (sheet[XLSX.utils.encode_cell({ r: 1, c: colIndex })]) {
                             colIndex++;
                         }
-                        colIndex--;
                     }
 
                     console.log(colIndex)
@@ -98,11 +98,32 @@ function ExcelUpload() {
     
     // Function to handle column selection and print column data to the console
     const handleColumnSelect = async (column) => {
-        setSelectedColumn(column);
+        // If the column is already selected, remove it. Otherwise, add it.
+        if (selectedColumns.includes(column)) {
+            setSelectedColumns(prevColumns => prevColumns.filter(col => col !== column));
+        } else {
+            setSelectedColumns(prevColumns => [...prevColumns, column]);
+        }
+
+        console.log(selectedColumns)
+    };
+
+    const startAnalysis = async () => {
+        const combinedRowsData = data.map(row => {
+            return selectedColumns
+                .map(col => row[col])
+                .filter(item => item !== undefined)
+                .join(' ');
+        });
+        
+
+        console.log(combinedRowsData)
+
+        let columnData = combinedRowsData;
     
         // Extract data from the selected column
-        const columnData = data.map(row => row[column]).filter(item => item !== undefined);
-        console.log(`Data from column ${column}:`, columnData);
+        // const columnData = data.map(row => row[column]).filter(item => item !== undefined);
+        console.log(`Data from combined column:`, columnData);
 
         // Remove commas from each string in columnData
         const cleanedColumnData = columnData.map(item => (typeof item === 'string' ? item.replace(/,/g, '') : item));
@@ -142,6 +163,8 @@ function ExcelUpload() {
             let item = items[index];
             let itemResults = [];
 
+            
+
             if (isUPC(item.name)) {
                 let result = await fetchEbayData(item.name);
                 console.log(result);
@@ -155,7 +178,9 @@ function ExcelUpload() {
             } else {
                 for (let category of item.categories) {
                     try {
+                        console.log(item)
                         let result = await fetchEbayData(item.name, category);
+                        console.log(result)
                         itemResults.push(result);
                     } catch (error) {
                         console.error(`Error processing item at index ${index}:`, error);
@@ -167,7 +192,7 @@ function ExcelUpload() {
                 for (let i = 0; i < 3; i++) {
                     const currentItem = itemResults[i];
                     
-                    if (currentItem.average_price == null) {
+                    if (currentItem == null || currentItem.average_price == null) {
                         prices.push('-1');
 
                         guess += `guess: ${i}`+
@@ -215,22 +240,26 @@ function ExcelUpload() {
         }
 
         updateExcel(updates);
-    };
-
+    }
 
     
     async function fetchCorrectPrice(item, priceList) {
+        let controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+    
+        // Append the prompt to the URL as a query parameter
+        const url = `http://localhost:3000/getCorrectPrice?item=${encodeURIComponent(item)}&priceList=${encodeURIComponent(priceList)}`;
+    
         try {
-    
-            // Append the prompt to the URL as a query parameter
-            const url = `http://localhost:3000/getCorrectPrice?item=${encodeURIComponent(item)}&priceList=${encodeURIComponent(priceList)}`;
-    
             const response = await fetch(url, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json'
-                }
+                },
+                signal: controller.signal,
             });
+    
+            clearTimeout(timeoutId); // Clear the timeout if the request completes successfully
     
             if (!response.ok) {
                 throw new Error(`HTTP error! Status: ${response.status}`);
@@ -239,24 +268,49 @@ function ExcelUpload() {
             const data = await response.json();
             return data.result;
         } catch (error) {
-            console.error(`Failed to fetch for item: ${item}`, error);
-            return null;
+            // Clear the timeout if the request fails
+            clearTimeout(timeoutId);
+    
+            // try one more time
+            try {
+                controller = new AbortController();
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    signal: controller.signal,
+                });
+    
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+    
+                const data = await response.json();
+                return data.result;
+            } catch (innerError) {
+                console.error(`Failed to fetch for item: ${item}`, innerError);
+                return null;
+            }
         }
     }
     
-
     async function fetchGPTCategory(item) {
-        try {
-    
-            // Append the prompt to the URL as a query parameter
-            const url = `http://localhost:3000/gptCategory?prompt=${encodeURIComponent(item)}`;
-    
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+        // Append the prompt to the URL as a query parameter
+        const url = `http://localhost:3000/gptCategory?prompt=${encodeURIComponent(item)}`;
+
+        try {    
             const response = await fetch(url, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json'
-                }
+                },
+                signal: controller.signal,
             });
+            clearTimeout(timeoutId);
     
             if (!response.ok) {
                 throw new Error(`HTTP error! Status: ${response.status}`);
@@ -265,23 +319,50 @@ function ExcelUpload() {
             const data = await response.json();
             return data.result;
         } catch (error) {
-            console.error(`Failed to fetch for item: ${item}`, error);
-            return null;
+            // try one more time
+            clearTimeout(timeoutId);
+            try {
+                controller = new AbortController();
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    signal: controller.signal,
+                });
+        
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+        
+                const data = await response.json();
+                return data.result;
+
+            } catch {
+                
+                console.error(`Failed to fetch for item: ${item}`, error);
+                return null;
+            }
         }
     }
 
     async function fetchEbayData(item, categoryNum) {
+        let controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+    
+        // Append the prompt to the URL as a query parameter
+        const url = `http://localhost:3000/getEbayData?itemName=${encodeURIComponent(item)}&category=${encodeURIComponent(categoryNum)}`;
+    
         try {
-    
-            // Append the prompt to the URL as a query parameter
-            const url = `http://localhost:3000/getEbayData?itemName=${encodeURIComponent(item)}&category=${encodeURIComponent(categoryNum)}`;
-    
             const response = await fetch(url, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json'
-                }
+                },
+                signal: controller.signal,
             });
+    
+            clearTimeout(timeoutId); // Clear the timeout if the request completes successfully
     
             if (!response.ok) {
                 throw new Error(`HTTP error! Status: ${response.status}`);
@@ -290,10 +371,33 @@ function ExcelUpload() {
             const data = await response.json();
             return data;
         } catch (error) {
-            console.error(`Failed to fetch for item: ${item}`, error);
-            return null;
+            // Clear the timeout if the request fails
+            clearTimeout(timeoutId);
+    
+            // try one more time
+            try {
+                controller = new AbortController();
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    signal: controller.signal,
+                });
+    
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+    
+                const data = await response.json();
+                return data;
+            } catch (innerError) {
+                console.error(`Failed to fetch for item: ${item}`, innerError);
+                return null;
+            }
         }
     }
+    
     
 
     // JSX for rendering the file upload input and table
@@ -302,16 +406,26 @@ function ExcelUpload() {
             <input type="file" onChange={onFileChange} />
             {data.length > 0 && (
                 <>
+                    <div>
+                        <button onClick={startAnalysis}>Start Analysis</button>
+                        <button onClick={() => window.location.reload()}>Stop</button>
+                    </div>
+
                     <div className="progress-container">
                         <div className="progress-fill" style={{ width: `${progress}%` }}></div>
                         <div className="progress-text">{progress.toFixed(0)}%</div> {/* Display percentage */}
                     </div>
+
                     <table>
                         <thead>
                             {/* Render table headers with onClick handler for column selection */}
                             <tr>
                                 {Object.keys(data[0] || {}).map((header, index) => (
-                                    <th key={index} onClick={() => handleColumnSelect(header)}>
+                                    <th 
+                                        key={index} 
+                                        onClick={() => handleColumnSelect(header)}
+                                        style={{ backgroundColor: selectedColumns.includes(header) ? 'lightgray' : 'transparent' }} // Highlight if selected
+                                    >
                                         {header}
                                     </th>
                                 ))}
