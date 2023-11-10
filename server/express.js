@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
@@ -6,8 +8,9 @@ const request = require('request');
 const OpenAI = require("openai");
 
 const app = express();
-app.listen(3000, () => {
-    console.log("Server is running at http://localhost:3000");
+const port = process.env.PORT || 3000;
+app.listen(port, () => {
+    console.log(`Server is running at http://localhost:${port}`);
 });
 app.use(express.json());
 app.use(cors());
@@ -18,7 +21,7 @@ const upload = multer({ storage: storage });
 let uploadedWorkbookBuffer = null; // Store the uploaded Excel buffer here
 
 const openai = new OpenAI({
-    apiKey: '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'
+    apiKey: process.env.OPENAI_API_KEY
 });
 
 app.get("/gptCategory", async (req, res) => {
