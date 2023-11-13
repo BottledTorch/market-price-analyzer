@@ -1,4 +1,3 @@
-// ExcelService.js
 import * as XLSX from 'xlsx';
 
 export async function updateExcel(file, dataToUpdate) {
@@ -7,14 +6,18 @@ export async function updateExcel(file, dataToUpdate) {
         // Read the uploaded Excel file
         const reader = new FileReader();
         let colIndex = 0;
+        let updatedRows = 0; // Counter for updated rows
         reader.onload = function(e) {
             const data = e.target.result;
             const workbook = XLSX.read(data, { type: 'binary' });
+            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+
+            // Determine the total number of rows in the sheet
+            const totalRows = XLSX.utils.decode_range(sheet['!ref']).e.r;
 
             // Update the Excel file based on dataToUpdate
             for (const update of dataToUpdate) {
                 const { row, prediction } = update;
-                const sheet = workbook.Sheets[workbook.SheetNames[0]];
 
                 if (colIndex === 0) {
                     while (sheet[XLSX.utils.encode_cell({ r: 1, c: colIndex })]) {
@@ -25,8 +28,14 @@ export async function updateExcel(file, dataToUpdate) {
                 console.log(colIndex)
 
                 const cellRef = XLSX.utils.encode_cell({ r: row, c: colIndex });
-                sheet[cellRef] = { t: 'n', v: prediction };
+                if (!sheet[cellRef] || sheet[cellRef].v !== prediction) {
+                    sheet[cellRef] = { t: 'n', v: prediction };
+                    updatedRows++; // Increment the counter for updated rows
+                }
             }
+
+            // Alert to show how many rows were updated out of total rows
+            alert(`${updatedRows}/${totalRows} rows were updated`);
 
             // Convert the updated workbook to a Blob and trigger a download
             const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'binary' });
