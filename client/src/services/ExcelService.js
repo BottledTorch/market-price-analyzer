@@ -15,17 +15,18 @@ export async function updateExcel(file, dataToUpdate) {
             // Determine the total number of rows in the sheet
             const totalRows = XLSX.utils.decode_range(sheet['!ref']).e.r;
 
+            // Find the next available column index
+            while (sheet[XLSX.utils.encode_cell({ r: 0, c: colIndex })]) {
+                colIndex++;
+            }
+
+            // Set the header for the new column
+            const headerCellRef = XLSX.utils.encode_cell({ r: 0, c: colIndex });
+            sheet[headerCellRef] = { t: 's', v: 'MPA ESTIMATE' };
+
             // Update the Excel file based on dataToUpdate
             for (const update of dataToUpdate) {
                 const { row, prediction } = update;
-
-                if (colIndex === 0) {
-                    while (sheet[XLSX.utils.encode_cell({ r: 1, c: colIndex })]) {
-                        colIndex++;
-                    }
-                }
-
-                console.log(colIndex)
 
                 const cellRef = XLSX.utils.encode_cell({ r: row, c: colIndex });
                 if (!sheet[cellRef] || sheet[cellRef].v !== prediction) {

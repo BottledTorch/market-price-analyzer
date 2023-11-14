@@ -1,9 +1,7 @@
-// AnalysisService.js
 import { fetchGPTCategory, fetchEbayData, fetchCorrectPrice } from './ApiService';
 import { isUPC } from './Utils';
-import { updateExcel } from './ExcelService';
 
-export const startAnalysis = async (file, data, selectedColumns, setProgress) => {
+export const startAnalysis = async (data, selectedColumns, setProgress) => {
     const combinedRowsData = data.map(row => {
         return selectedColumns
             .map(col => row[col])
@@ -13,17 +11,15 @@ export const startAnalysis = async (file, data, selectedColumns, setProgress) =>
 
     console.log(combinedRowsData);
 
-    // Remove commas from each string in columnData
     const cleanedColumnData = combinedRowsData.map(item => 
         typeof item === 'string' ? item.replace(/,/g, '') : item
     );
 
     const items = [];
-    const updates = []; // Array to accumulate updates
+    const results = []; // Array to accumulate results for the popup
 
-    // Process each item to detect categories
     for (let index = 0; index < cleanedColumnData.length; index++) {
-        setProgress(((index + 1) / (cleanedColumnData.length * 2)) * 100);
+        setProgress((index / cleanedColumnData.length) * 50);
         const itemName = cleanedColumnData[index];
         const item = { name: itemName, categories: [] };
 
@@ -36,25 +32,29 @@ export const startAnalysis = async (file, data, selectedColumns, setProgress) =>
 
     console.log("Category Detection Complete");
 
-    // Process each item to fetch price data and make predictions
     for (let index = 0; index < items.length; index++) {
-        setProgress(((index + 1) / (cleanedColumnData.length * 2)) * 100 + 50);
+        setProgress(50 + (index / items.length) * 50);
         const item = items[index];
 
         if (isUPC(item.name)) {
-            await processUPCItem(item, index, updates);
+            const price = await processUPCItem(item, index);
+            results.push({ itemName: item.name, estimatedPrice: roundToTwoDecimals(price) });
         } else {
-            await processNonUPCItem(item, index, updates);
+            const price = await processNonUPCItem(item, index);
+            results.push({ itemName: item.name, estimatedPrice: roundToTwoDecimals(price) });
         }
     }
 
-    // Update the Excel file with the new data
-    updateExcel(file, updates);
+    return results; // Return the results for the popup
 };
+
+// Helper function to round a number to two decimal places
+function roundToTwoDecimals(num) {
+    return num ? parseFloat(num.toFixed(2)) : num;
+}
 
 async function processItemCategories(item, index) {
     try {
-        console.log(item.name);
         const categories = await fetchGPTCategory(item.name);
         item.categories = extractCategoryNumbers(categories);
     } catch (error) {
@@ -66,25 +66,26 @@ function extractCategoryNumbers(categories) {
     return (categories.match(/#(\d+)/g) || []).map(match => parseInt(match.slice(1), 10));
 }
 
-async function processUPCItem(item, index, updates) {
+async function processUPCItem(item, index) {
     try {
         const result = await fetchEbayData(item.name);
-        console.log(result);
-        updates.push(createUpdateObject(index, result.average_price));
+        return result.average_price;
     } catch (error) {
         console.error(`Error processing UPC item at index ${index}:`, error);
-        updates.push(createUpdateObject(index, -1));
+        return -1;
     }
 }
 
-async function processNonUPCItem(item, index, updates) {
+async function processNonUPCItem(item, index) {
     const itemResults = await fetchItemResults(item, index);
     const prices = itemResults.map(res => res ? res.average_price : '-1');
     const guessString = createGuessString(itemResults);
 
     if (guessString && !prices.every(val => val === '-1')) {
-        await makeFinalPrediction(item, index, prices, guessString, updates);
+        const price = await makeFinalPrediction(item, index, prices, guessString);
+        return price;
     }
+    return -1;
 }
 
 async function fetchItemResults(item, index) {
@@ -114,27 +115,21 @@ function createGuessString(itemResults) {
     }).join('');
 }
 
-async function makeFinalPrediction(item, index, prices, guessString, updates) {
+async function makeFinalPrediction(item, index, prices, guessString) {
     try {
         const result = await fetchCorrectPrice(item.name, guessString);
-        console.log(guessString, result)
         const jsonPattern = /{[^}]+}/;
         const jsonString = (result.match(jsonPattern) || [])[0];
 
         if (jsonString) {
             const parsedResult = JSON.parse(jsonString);
-            updates.push(createUpdateObject(index, prices[parsedResult.guess]));
+            return prices[parsedResult.guess];
         } else {
             console.error("Failed to extract JSON from result:", result);
+            return -1;
         }
     } catch (error) {
         console.error(`Error making final prediction for item at index ${index}:`, error);
+        return -1;
     }
-}
-
-function createUpdateObject(index, prediction) {
-    return {
-        row: index + 1,
-        prediction: prediction !== undefined ? prediction : -1
-    };
 }
