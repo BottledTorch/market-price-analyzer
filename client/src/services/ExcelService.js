@@ -2,44 +2,34 @@ import * as XLSX from 'xlsx';
 
 export async function updateExcel(file, dataToUpdate) {
     try {
-        console.log('updating excel:', dataToUpdate)
+        console.log('updating excel:', dataToUpdate);
+
         // Read the uploaded Excel file
         const reader = new FileReader();
-        let colIndex = 0;
-        let updatedRows = 0; // Counter for updated rows
         reader.onload = function(e) {
             const data = e.target.result;
-            const workbook = XLSX.read(data, { type: 'binary' });
-            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+            const oldWorkbook = XLSX.read(data, { type: 'binary' });
+            const oldSheet = oldWorkbook.Sheets[oldWorkbook.SheetNames[0]];
 
-            // Determine the total number of rows in the sheet
-            const totalRows = XLSX.utils.decode_range(sheet['!ref']).e.r;
+            // Convert old sheet to array of arrays (AoA)
+            const oldSheetData = XLSX.utils.sheet_to_json(oldSheet, { header: 1 });
 
-            // Find the next available column index
-            while (sheet[XLSX.utils.encode_cell({ r: 0, c: colIndex })]) {
-                colIndex++;
-            }
-
-            // Set the header for the new column
-            const headerCellRef = XLSX.utils.encode_cell({ r: 0, c: colIndex });
-            sheet[headerCellRef] = { t: 's', v: 'MPA ESTIMATE' };
-
-            // Update the Excel file based on dataToUpdate
+            // Add the new column data to each row in the old sheet data
+            oldSheetData[0].push("MPA Prediction")
             for (const update of dataToUpdate) {
                 const { row, prediction } = update;
-
-                const cellRef = XLSX.utils.encode_cell({ r: row, c: colIndex });
-                if (!sheet[cellRef] || sheet[cellRef].v !== prediction) {
-                    sheet[cellRef] = { t: 'n', v: prediction };
-                    updatedRows++; // Increment the counter for updated rows
-                }
+                oldSheetData[row].push(prediction)
             }
 
-            // Alert to show how many rows were updated out of total rows
-            alert(`${updatedRows}/${totalRows} rows were updated`);
+            // Create a new workbook and a new sheet with the updated data
+            const newWorkbook = XLSX.utils.book_new();
+            const newSheet = XLSX.utils.aoa_to_sheet(oldSheetData);
+
+            // Add the new sheet to the workbook
+            XLSX.utils.book_append_sheet(newWorkbook, newSheet, "UpdatedSheet");
 
             // Convert the updated workbook to a Blob and trigger a download
-            const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'binary' });
+            const wbout = XLSX.write(newWorkbook, { bookType: 'xlsx', type: 'binary' });
             const blob = new Blob([s2ab(wbout)], { type: 'application/octet-stream' });
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -49,11 +39,11 @@ export async function updateExcel(file, dataToUpdate) {
             a.click();
             document.body.removeChild(a);
             window.URL.revokeObjectURL(url);
-            console.log("Excel updated and downloaded successfully!");
+            console.log("New Excel generated and downloaded successfully!");
         };
         reader.readAsBinaryString(file);
     } catch (error) {
-        console.error("Error updating Excel:", error.message, error.stack);
+        console.error("Error generating new Excel:", error.message, error.stack);
     }
 }
 

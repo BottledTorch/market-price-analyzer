@@ -67,6 +67,7 @@ function ExcelUpload() {
             // Set the analysis results to state and show the popup
             setAnalysisResults(results);
             setShowPopup(true);
+            setProgress(100); 
         } catch (error) {
             console.error("Error during analysis:", error);
             alert("An error occurred during analysis. Please check the console for more details.");
